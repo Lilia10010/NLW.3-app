@@ -1,66 +1,78 @@
-//para inserir no bd
-import { Request, Response } from 'express'
-import { getRepository } from 'typeorm'
+import { Request, Response } from 'express';
+import { getRepository } from 'typeorm';
+import Orphanage from '../models/Orphanage';
+import orphanageViews from '../views/orphanages_views';
+import * as Yup from 'yup';
 
-import Orphanage from '../models/Orphanage'
+export default {
+    async index(request: Request, response: Response) {
+        const orphanagesRepository = getRepository(Orphanage);
+        const orphanages = await orphanagesRepository.find({
+            relations: ['images']
+        })
 
-
-
-export default{
-    async index(request: Request, response: Response){
-        const orphanegesRepository = getRepository(Orphanage)
-
-        //listar orphanages
-        const orphanages = await orphanegesRepository.find()
-
-        return response.json(orphanages)
-        
-
+        return response.status(200).json(orphanageViews.renderMany(orphanages))
     },
-    async show(request: Request, response: Response){
-        //pegar o id (tem quer ser o mesmo nome que coloca em routes.ts)
-        const { id } = request.params
+    async show(request: Request, response: Response) {
+        const { id } = request.params;
 
-        const orphanegesRepository = getRepository(Orphanage)
+        const orphanagesRepository = getRepository(Orphanage);
+        const orphanage = await orphanagesRepository.findOneOrFail(id, {
+            relations: ['images']
+        })
 
-        //listar orphanages
-        const orphanage = await orphanegesRepository.findOneOrFail(id)
-
-        return response.json(orphanage)
-        
-
+        return response.status(200).json(orphanageViews.render(orphanage))
     },
+    async create(request: Request, response: Response) {
+        const { 
+            name,
+            latitude,
+            longitude,
+            about,
+            instructions,
+            opening_hours,
+            open_on_weekends,
+        } = request.body;
+    
+        const orphanagesRepository = getRepository(Orphanage);
 
-    async create(request: Request, response: Response){
-    // console.log(request.body) 
-    const{
-        name,
-        latitude,
-        longitude,
-        about,
-        instructions,
-        opening_hours,
-        open_on_weekends
-    } = request.body
+        const requestImages = request.files as Express.Multer.File[];
+        const images = requestImages.map(image => {
+            return { path: image.filename}
+        })
 
-    const orphanegesRepository = getRepository(Orphanage)
+        const data = {
+            name,
+            latitude,
+            longitude,
+            about,
+            instructions,
+            opening_hours,
+            open_on_weekends,
+            images
+        };
 
-    //tabela précriada
-    const orphanage = orphanegesRepository.create({ 
-        name,
-        latitude,
-        longitude,
-        about,
-        instructions,
-        opening_hours,
-        open_on_weekends
-     })
+        const schema = Yup.object().shape({
+            name: Yup.string().required('Nome obrigatório!'),
+            latitude: Yup.number().required(),
+            longitude: Yup.number().required(),
+            about: Yup.string().required().max(300),
+            instructions: Yup.string().required(),
+            opening_hours: Yup.string().required(),
+            open_on_weekends: Yup.boolean().required(),
+            images: Yup.array(Yup.object().shape({
+                path: Yup.string().required(),
+            })),
+        });
 
-     //tabela salva no bd
+        await schema.validate(data, {
+            abortEarly: false,
+        });
 
-     await orphanegesRepository.save(orphanage)
-
-     //colocar o status 201 (opcional) para deixar api mais organizada
-    return response.status(201).json( orphanage )
+        const orphanage = orphanagesRepository.create(data);
+    
+        await orphanagesRepository.save(orphanage)
+    
+        return response.status(201).json(orphanage)
     }
 }
