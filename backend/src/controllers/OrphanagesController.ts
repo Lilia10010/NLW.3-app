@@ -48,10 +48,10 @@ export default {
             about,
             instructions,
             opening_hours,
-            open_on_weekends: <boolean>open_on_weekends,
+            open_on_weekends: open_on_weekends === 'true',
             images
         };
-        console.log('open_on_weekends:', data.open_on_weekends)
+        // console.log('open_on_weekends:', data.open_on_weekends)
 
         const schema = Yup.object().shape({
             name: Yup.string().required('Nome obrigatório!'),
